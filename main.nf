@@ -89,6 +89,7 @@ process runArtic {
         tuple file("${sample_name}.pass.named.vcf.gz"), file("${sample_name}.pass.named.vcf.gz.tbi")
         file "${sample_name}.depth.txt"
         file "${sample_name}.pass.named.stats"
+        tuple file("${sample_name}.trimmed.rg.sorted.bam"), file("${sample_name}.trimmed.rg.sorted.bam.bai")
     """
     run_artic.sh \
         ${sample_name} ${directory} ${params._min_len} ${params._max_len} \
@@ -202,8 +203,8 @@ workflow pipeline {
         runArtic(samples, scheme_directory)
         // collate consensus and variants
         all_consensus = allConsensus(runArtic.out[0].collect())
-        tmp = runArtic.out[1].toList().transpose().toList() // surely theres another way?
-        all_variants = allVariants(tmp)
+        variants = runArtic.out[1].toList().transpose().toList() // surely theres another way?
+        all_variants = allVariants(variants)
         // nextclade
         clades = nextclade(all_consensus[0], reference, primers)
         // report
@@ -213,7 +214,14 @@ workflow pipeline {
             clades.collect(), 
             runArtic.out[3].collect(),
             all_consensus[1])
-        results = all_consensus[0].concat(all_consensus[1], all_variants[0].flatten(), html_doc)
+        results = all_consensus[0].concat(
+            all_consensus[1], 
+            all_variants[0].flatten(), 
+            html_doc, 
+            runArtic.out[0].flatten(),
+            runArtic.out[4].flatten(),
+            variants.flatten()
+        )
     emit:
         results
 }
